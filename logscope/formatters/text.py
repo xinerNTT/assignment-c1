@@ -44,3 +44,9 @@ def format_timeline(buckets: dict[str, int]) -> str:
         lines.append(f"  {label} | {bar}  ({count})")
     lines.append("=" * 55)
     return "\n".join(lines)
+
+
+def format_grep(entries: list) -> str:
+    if not entries:
+        return "No matching log entries found."
+    return "\n".join(e.raw for e in entries)
