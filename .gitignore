@@ -1,0 +1,38 @@
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Generated reports
+*.md.report
+summary_report.md
+timeline_report.md
+grep_report.md
+
+# Large generated logs
+sample_100mb.log
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# graphify-axet
+.graphify/
