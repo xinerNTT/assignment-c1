@@ -34,9 +34,17 @@ def summary_cmd(logfile: str, fmt: str) -> None:
     """Show counts, top errors and timestamp range for LOGFILE."""
     from logscope.analysers import summary as sa
     from logscope.formatters import text as tf
+    from logscope.formatters import json_fmt
+    from logscope.formatters import markdown as md
 
     result = sa.run(stream_lines(logfile))
-    click.echo(tf.format_summary(result))
+    if fmt == "json":
+        click.echo(json_fmt.to_json(json_fmt.summary_to_dict(result)))
+    elif fmt == "md":
+        path = md.summary_report(result)
+        click.echo(f"Report written to {path}")
+    else:
+        click.echo(tf.format_summary(result))
 
 
 # ---------------------------------------------------------------------------
@@ -51,6 +59,8 @@ def timeline_cmd(logfile: str, bucket_str: str, fmt: str) -> None:
     """Show ERROR counts grouped by time bucket for LOGFILE."""
     from logscope.analysers import timeline as tla
     from logscope.formatters import text as tf
+    from logscope.formatters import json_fmt
+    from logscope.formatters import markdown as md
 
     try:
         bucket_minutes = tla.parse_bucket_size(bucket_str)
@@ -58,7 +68,13 @@ def timeline_cmd(logfile: str, bucket_str: str, fmt: str) -> None:
         _abort(str(exc))
 
     buckets = tla.run(stream_lines(logfile), bucket_minutes=bucket_minutes)
-    click.echo(tf.format_timeline(buckets))
+    if fmt == "json":
+        click.echo(json_fmt.to_json(json_fmt.timeline_to_dict(buckets)))
+    elif fmt == "md":
+        path = md.timeline_report(buckets)
+        click.echo(f"Report written to {path}")
+    else:
+        click.echo(tf.format_timeline(buckets))
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +102,8 @@ def grep_cmd(logfile: str, level: Optional[str], since_str: Optional[str], fmt: 
     """Filter and display log entries from LOGFILE."""
     from logscope.analysers import grep as ga
     from logscope.formatters import text as tf
+    from logscope.formatters import json_fmt
+    from logscope.formatters import markdown as md
 
     since: Optional[datetime] = None
     if since_str:
@@ -95,4 +113,10 @@ def grep_cmd(logfile: str, level: Optional[str], since_str: Optional[str], fmt: 
             _abort(str(exc))
 
     entries = list(ga.run(stream_lines(logfile), level=level, since=since))
-    click.echo(tf.format_grep(entries))
+    if fmt == "json":
+        click.echo(json_fmt.to_json(json_fmt.grep_to_dict(entries)))
+    elif fmt == "md":
+        path = md.grep_report(entries)
+        click.echo(f"Report written to {path}")
+    else:
+        click.echo(tf.format_grep(entries))
