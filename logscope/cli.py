@@ -120,3 +120,6 @@ def grep_cmd(logfile: str, level: Optional[str], since_str: Optional[str], fmt: 
         click.echo(f"Report written to {path}")
     else:
         click.echo(tf.format_grep(entries))
+
+if __name__ == "__main__":
+    main()
