@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Synthetic log generator for logscope benchmarking.
+
+Usage:
+    python scripts/gen_log --size 100MB
+    python scripts/gen_log --size 10MB --output custom.log
+"""
+
+from __future__ import annotations
+
+import random
+import re
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import click
+
+INFO_MESSAGES = [
+    "Request received from {ip}",
+    "Connection established to {host}",
+    "Cache hit for key {key}",
+    "Worker thread {tid} started",
+    "Config reloaded successfully",
+    "Health check passed",
+    "User {uid} authenticated",
+    "Response sent in {ms}ms",
+]
+
+WARN_MESSAGES = [
+    "Disk usage at {pct}% on {vol}",
+    "Response time {ms}ms exceeds threshold",
+    "Retry {n} of 3 for {svc}",
+    "Memory usage high: {pct}%",
+    "Rate limit approaching for client {ip}",
+    "Slow query detected: {ms}ms",
+]
+
+ERROR_MESSAGES = [
+    "Failed to connect to DB: timeout after {ms}ms",
+    "Disk full on volume {vol}",
+    "Unhandled exception in {svc}: {exc}",
+    "OOM killed worker {tid}",
+    "Authentication failed for user {uid}",
+    "Service {svc} returned HTTP {code}",
+    "Job {job} failed after {n} retries",
+    "Connection pool exhausted for {host}",
+]
+
+MALFORMED_LINES = [
+    "STACKTRACE: java.lang.NullPointerException",
+    "    at com.example.App.run(App.java:42)",
+    "",
+    "--- RESTART ---",
+    "core dumped",
+]
+
+EXCEPTIONS = ["NullPointerException", "IndexOutOfBounds", "KeyError", "ValueError"]
+SERVICES   = ["auth-svc", "db-proxy", "cache", "api-gateway", "worker"]
+VOLUMES    = ["/dev/sda1", "/dev/sdb", "/mnt/data"]
+HOSTS      = ["db-primary", "db-replica", "redis-1", "kafka-1"]
+
+
+def _rand_ip() -> str:
+    return ".".join(str(random.randint(1, 254)) for _ in range(4))
+
+
+def _fill(template: str) -> str:
+    subs = {
+        "{ip}":   _rand_ip(),
+        "{host}": random.choice(HOSTS),
+        "{key}":  f"key:{random.randint(1000, 9999)}",
+        "{tid}":  str(random.randint(1, 32)),
+        "{uid}":  f"user{random.randint(100, 999)}",
+        "{ms}":   str(random.randint(1, 5000)),
+        "{pct}":  str(random.randint(70, 99)),
+        "{vol}":  random.choice(VOLUMES),
+        "{svc}":  random.choice(SERVICES),
+        "{n}":    str(random.randint(1, 5)),
+        "{exc}":  random.choice(EXCEPTIONS),
+        "{code}": str(random.choice([500, 502, 503, 504])),
+        "{job}":  f"job-{random.randint(1, 100):03d}",
+    }
+    result = template
+    for k, v in subs.items():
+        result = result.replace(k, v)
+    return result
+
+
+def _parse_size(size_str: str) -> int:
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(B|KB|MB|GB)", size_str.strip().upper())
+    if m is None:
+        raise click.BadParameter(f"Cannot parse size {size_str!r}. Use e.g. 100MB.")
+    value, unit = float(m.group(1)), m.group(2)
+    return int(value * {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3}[unit])
+
+
+@click.command()
+@click.option("--size",   default="100MB", show_default=True)
+@click.option("--output", "output_path", default="sample_100mb.log", show_default=True)
+@click.option("--seed",   default=42, show_default=True)
+def main(size: str, output_path: str, seed: int) -> None:
+    """Generate a synthetic log file of approximately SIZE bytes."""
+    target = _parse_size(size)
+    random.seed(seed)
+
+    ts    = datetime(2026, 10, 1, 8, 0, 0)
+    delta = timedelta(milliseconds=50)
+    pool  = ["INFO"] * 70 + ["WARN"] * 15 + ["ERROR"] * 12 + ["MALFORMED"] * 3
+
+    click.echo(f"Generating {size} → {output_path} …", err=True)
+    written = 0
+
+    with open(output_path, "w", encoding="utf-8", buffering=1 << 20) as fh:
+        while written < target:
+            kind = random.choice(pool)
+            ts  += delta * random.randint(1, 10)
+
+            if kind == "MALFORMED":
+                line = _fill(random.choice(MALFORMED_LINES))
+            elif kind == "INFO":
+                line = f"{ts:%Y-%m-%d %H:%M:%S} INFO  {_fill(random.choice(INFO_MESSAGES))}"
+            elif kind == "WARN":
+                line = f"{ts:%Y-%m-%d %H:%M:%S} WARN  {_fill(random.choice(WARN_MESSAGES))}"
+            else:
+                line = f"{ts:%Y-%m-%d %H:%M:%S} ERROR {_fill(random.choice(ERROR_MESSAGES))}"
+
+            fh.write(line + "\n")
+            written += len(line) + 1
+
+    final = Path(output_path).stat().st_size
+    click.echo(f"Done. Wrote {final / 1024 / 1024:.1f} MB to {output_path}", err=True)
+
+
+if __name__ == "__main__":
+    main()
