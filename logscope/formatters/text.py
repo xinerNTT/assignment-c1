@@ -1,4 +1,4 @@
-"""Plain-text renderer for summary output."""
+"""Plain-text renderers for all logscope commands."""
 
 from __future__ import annotations
 
@@ -30,4 +30,17 @@ def format_summary(result: SummaryResult) -> str:
             truncated = msg if len(msg) <= 70 else msg[:67] + "..."
             lines.append(f"    {i}. [{cnt:>4}x] {truncated}")
     lines.append("=" * 50)
+    return "\n".join(lines)
+
+
+def format_timeline(buckets: dict[str, int]) -> str:
+    if not buckets:
+        return "No ERROR entries found in the specified time range."
+    max_count = max(buckets.values())
+    scale = _MAX_BAR_WIDTH / max_count if max_count else 1
+    lines = ["=" * 55, "  ERROR TIMELINE", "=" * 55]
+    for label, count in buckets.items():
+        bar = _BAR_CHAR * max(1, round(count * scale))
+        lines.append(f"  {label} | {bar}  ({count})")
+    lines.append("=" * 55)
     return "\n".join(lines)
